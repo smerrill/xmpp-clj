@@ -10,11 +10,12 @@
 	    PacketListener]
 	   [org.jivesoftware.smack.packet Message Presence Presence$Type Message$Type]
 	   [org.jivesoftware.smack.filter MessageTypeFilter]
+	   [org.jivesoftware.smackx.muc MultiUserChat]
 	   [org.jivesoftware.smack.util StringUtils]))
 
 (def available-presence (Presence. Presence$Type/available))
 
-(def chat-message-type-filter (MessageTypeFilter. Message$Type/chat))
+(def chat-message-type-filter (MessageTypeFilter. Message$Type/groupchat))
 
 (defn packet-listener [conn processor]
   (proxy 
@@ -69,6 +70,10 @@
     (let [resp (handler message)]
       (reply message resp conn))))
 
+(defn join-room [conn room-name nick]
+  (let [chat-room (MultiUserChat. conn room-name)]
+    (.join chat-room nick)))
+
 (defn start-bot
   "Defines and starts an instant messaging bot that will respond to incoming
    messages. start-bot takes 2 parameters, the first is a map representing 
@@ -103,11 +108,14 @@
 	host (:host connect-info)
 	domain (:domain connect-info)
         port (get connect-info :port 5222)
+        rooms (:rooms connect-info)
 	connect-config (ConnectionConfiguration. host port domain)
 	conn (XMPPConnection. connect-config)]
     (.connect conn)
     (.login conn un pw)
     (.sendPacket conn available-presence)
+    (if (vector? rooms)
+      (apply #(join-room conn % un) rooms))
     (.addPacketListener
      conn
      (packet-listener conn (with-message-map (wrap-responder packet-processor)))
